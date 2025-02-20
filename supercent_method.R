@@ -23,11 +23,10 @@ raw_df[raw_df$ritardo_ingresso < 0, "ritardo_ingresso"] = 0
 
 # Plot the density of arrival delays
 plot(density(raw_df$ritardo_ingresso))
-
 # Calculate total delay and week number
 raw_df$ritardo = raw_df$ritardo_uscita - raw_df$ritardo_ingresso 
 raw_df$settimana = week(raw_df$data)
-
+plot(density(raw_df$ritardo),xlim=c(-1000,1000))
 # Calculate percentiles and mean delays
 percentili <- quantile(raw_df$ritardo, probs = c(0.25, 0.5, 0.75))
 print(percentili)
@@ -47,7 +46,7 @@ station_codes <- station_codes_agg
 # Aggregate data by stations and weeks
 raw_df[raw_df$stazione %in% urban_area, "stazione"] <- "MI_AGG"
 raw_df <- raw_df |> group_by(stazione, settimana) |> summarise(ritardo_totale = sum(ritardo))
-
+plot(density(raw_df$ritardo_totale),xlim=c(-30000,30000))
 # Create a list of aggregated data for the weeks
 Y = list()
 for (w in raw_df$settimana) {
@@ -89,8 +88,8 @@ for (w in weeks) {
 }
 
 # Remove specific weeks and prepare for modeling
-Y = Y[-c(35, 36, 52, 53)]
-new_weeks = weeks[-c(35, 36, 52, 53)]
+Y = Y[-c(52, 53)]
+new_weeks = weeks[-c( 52, 53)]
 lin_mod = list()
 # Create a list to store results
 ret = list()
@@ -113,7 +112,7 @@ for (w in 1:length(Y)) {
 
 # Cross-validation for the SuperCENT model
 for (w in 1:length(Y)) {
-  sup[[w]] <- cv.supercent(A[[new_weeks[w]]], X, Y[[w]]$ritardo_totale, l = nrow(Y[[1]]) * (ret[[w]]$epsy)^2 / (ret[[w]]$epsa), lrange = 2^4, gap = 2, folds = 4)
+  ret[[w]] <- cv.supercent(A[[new_weeks[w]]], X, Y[[w]]$ritardo_totale, l = nrow(Y[[1]]) * (ret[[w]]$epsy)^2 / (ret[[w]]$epsa), lrange = 2^4, gap = 2, folds = 4)
 }
 
 # Second stage modeling
@@ -141,7 +140,7 @@ diff_cent = list()
 diff = list()
 
 # Loop through each result to extract parameters
-for (w in 1:length(ret)) {
+for (w in 1:length(sup)) {
   betas_u[[w]] = sup[[w]]$beta[2]
   betas_v[[w]] = sup[[w]]$beta[3]
   U[[w]] = sup[[w]]$u
@@ -395,3 +394,7 @@ for (i in seq_along(curve_indices)) {
 # Create functional data object for Milan authority centrality
 fd_aut_Mi <- Data2fd(y = t(as.matrix(aut_df[1, -1])), argvals = t, basisobj = basis)
 plot.fd(fd_aut_Mi, xlab = "Week", ylab = "Milan Authority Centrality Over Weeks")
+
+
+
+
